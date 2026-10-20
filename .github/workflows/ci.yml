@@ -1,0 +1,42 @@
+name: WendyGo CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wendy-go-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2022]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Check formatting and module files
+        run: |
+          test -z "$(gofmt -l .)"
+          go mod tidy -diff
+      - name: Vet and test without cgo
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          go vet ./...
+          go test ./...
