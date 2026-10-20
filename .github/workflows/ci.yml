@@ -18,7 +18,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15, windows-2022]
+        # Pure Go without cgo: Linux and Windows cover it; hosted macOS capacity is scarce.
+        os: [ubuntu-24.04, windows-2022]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
