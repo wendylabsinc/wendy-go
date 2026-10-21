@@ -13,3 +13,8 @@ import "github.com/wendylabsinc/wendy-core/core"
 func HelloWorld() int32 {
 	return core.WendyHelloWorld()
 }
+
+// CoreVersion returns the version of the linked Wendy Core engine.
+func CoreVersion() string {
+	return core.Version()
+}
