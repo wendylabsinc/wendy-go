@@ -14,10 +14,10 @@ This is a scaffold: `HelloWorld()` is a temporary operation that proves the SDK 
 
 ## Wendy Core dependency
 
-Until Wendy Core publishes releases, `go.mod` pins a Core commit as a pseudo-version. To update it:
+`go.mod` requires Wendy Core `v0.0.1`. To move to a newer Core release:
 
 ```sh
-go get github.com/wendylabsinc/wendy-core@main
+go get github.com/wendylabsinc/wendy-core@vX.Y.Z
 go mod tidy
 ```
 
