@@ -16,15 +16,21 @@ This is a scaffold: `HelloWorld()` is a temporary operation that proves the SDK 
 ## Wendy Core dependency
 
 `CoreVersion()` reports Wendy Core's version directly, so clients do not need to
-duplicate the engine's version string. Unreleased Go dependencies report
-`0.1.0-dev+<7-character commit>`, for example `0.1.0-dev+2806e32`.
+duplicate the engine's version string. This seed reports `0.1.0-seed.1`.
 
-`go.mod` requires a pre-release pseudo-version of Wendy Core containing its
-version API. Once Wendy Core `v0.1.0` is released, move the dependency to
-`v0.1.0`. To move to a newer Core release:
+`go.mod` requires Wendy Core `v0.1.0-seed.1`.
+
+For the WendyGo seed release, request the pre-release explicitly:
 
 ```sh
-go get github.com/wendylabsinc/wendy-core@vX.Y.Z
+go get github.com/wendylabsinc/wendy-go@v0.1.0-seed.1
+```
+
+`@latest` selects the stable `v0.0.1` release instead of the seed pre-release.
+To select this seed of Wendy Core directly:
+
+```sh
+go get github.com/wendylabsinc/wendy-core@v0.1.0-seed.1
 go mod tidy
 ```
 
