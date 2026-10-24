@@ -2,8 +2,10 @@ package wendy_test
 
 import (
 	"context"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
@@ -31,7 +33,7 @@ const deviceVersionMethod = "/wendy.agent.services.v1.WendyAgentService/GetAgent
 
 type deviceTLSFixture struct {
 	ca         *x509.Certificate
-	caKey      *ecdsa.PrivateKey
+	caKey      crypto.Signer
 	chainPEM   string
 	credential wendy.DeviceTLSCredential
 }
@@ -42,10 +44,15 @@ func newDeviceTLSFixture(t *testing.T) deviceTLSFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
+	return newDeviceTLSFixtureWithCA(t, key)
+}
+
+func newDeviceTLSFixtureWithCA(t *testing.T, key crypto.Signer) deviceTLSFixture {
+	t.Helper()
 	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "device test CA"},
 		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour),
 		KeyUsage: x509.KeyUsageCertSign, BasicConstraintsValid: true, IsCA: true}
-	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, key.Public(), key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,6 +75,11 @@ func (f deviceTLSFixture) leaf(t *testing.T, principal string, eku x509.ExtKeyUs
 	if err != nil {
 		t.Fatal(err)
 	}
+	return f.leafWithKey(t, principal, eku, key)
+}
+
+func (f deviceTLSFixture) leafWithKey(t *testing.T, principal string, eku x509.ExtKeyUsage, key crypto.Signer) (string, string) {
+	t.Helper()
 	uri, err := url.Parse(principal)
 	if err != nil {
 		t.Fatal(err)
@@ -75,15 +87,15 @@ func (f deviceTLSFixture) leaf(t *testing.T, principal string, eku x509.ExtKeyUs
 	tmpl := &x509.Certificate{SerialNumber: big.NewInt(time.Now().UnixNano()), Subject: pkix.Name{CommonName: "test device"},
 		NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().Add(time.Hour),
 		KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{eku}, URIs: []*url.URL{uri}}
-	der, err := x509.CreateCertificate(rand.Reader, tmpl, f.ca, &key.PublicKey, f.caKey)
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, f.ca, key.Public(), f.caKey)
 	if err != nil {
 		t.Fatal(err)
 	}
-	keyDER, err := x509.MarshalECPrivateKey(key)
+	keyDER, err := x509.MarshalPKCS8PrivateKey(key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})), string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER}))
+	return string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})), string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}))
 }
 
 func (f deviceTLSFixture) serve(t *testing.T, principal string) (string, *atomic.Int32) {
@@ -417,5 +429,52 @@ func TestDeviceConnectorRealTCPFailure(t *testing.T) {
 	var networkError *net.OpError
 	if !errors.As(c.Evidence().TCPDialError, &networkError) {
 		t.Fatalf("missing original TCP error: %+v", c.Evidence())
+	}
+}
+
+func TestDeviceConnectorMLDSAOperatorAndChain(t *testing.T) {
+	caKey, err := mldsa.GenerateKey(mldsa.MLDSA65())
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := newDeviceTLSFixtureWithCA(t, caKey)
+	operatorKey, err := mldsa.GenerateKey(mldsa.MLDSA65())
+	if err != nil {
+		t.Fatal(err)
+	}
+	certPEM, keyPEM := f.leafWithKey(t, "spiffe://wendy.sh/tenant/3c0e434d-d082-4c11-a39a-c959d20afbd7/operator/person", x509.ExtKeyUsageClientAuth, operatorKey)
+	f.credential, err = wendy.LoadDeviceTLSCredential(certPEM, f.chainPEM, keyPEM, 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	address, _ := f.serve(t, "urn:wendy:org:7:asset:42")
+	c := openDevice(t, f.connector(t), address, &wendy.DeviceIdentity{OrgID: 7, EntityType: "asset", EntityID: "42"})
+	if _, err := probeDevice(c); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDeviceConnectorScopedAndLinkLocalRouting(t *testing.T) {
+	f := newDeviceTLSFixture(t)
+	address, _ := f.serve(t, "urn:wendy:org:7:asset:42")
+	_, port, err := net.SplitHostPort(address)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, host := range []string{"169.254.1.2", "fe80::1%wendy-test"} {
+		t.Run(host, func(t *testing.T) {
+			target := net.JoinHostPort(host, port)
+			connector := f.connector(t)
+			connector.DialContext = func(ctx context.Context, got string) (net.Conn, error) {
+				if got != target {
+					t.Errorf("dial target=%q want=%q", got, target)
+				}
+				return (&net.Dialer{}).DialContext(ctx, "tcp", address)
+			}
+			c := openDevice(t, connector, target, nil)
+			if _, err := probeDevice(c); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
