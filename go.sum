@@ -4,8 +4,10 @@ github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek
 github.com/golang/protobuf v1.5.4/go.mod h1:lnTiLA8Wa4RWRcIUkrtSVa5nRhsEGBg48fD6rSs7xps=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
-github.com/wendylabsinc/WendyOS/go/wendy-core v0.0.0-20261024213152-68128e84325a h1:fX43x0GUPmE22GMUaSxy8zHcMhfioNiAkbHWc6p6xyQ=
-github.com/wendylabsinc/WendyOS/go/wendy-core v0.0.0-20261024213152-68128e84325a/go.mod h1:j/pgGnkAkSloa41WEd5SWwt7XhNB4G7zy6QfVoZQ0cM=
+github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
+github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+github.com/wendylabsinc/WendyOS/go/wendy-core v0.0.0-20261024225416-0c4f13fed1a1 h1:hyJFg9+vAxEd7NfwtANzogA3ea+56/9bTNL9AZlE07s=
+github.com/wendylabsinc/WendyOS/go/wendy-core v0.0.0-20261024225416-0c4f13fed1a1/go.mod h1:j/pgGnkAkSloa41WEd5SWwt7XhNB4G7zy6QfVoZQ0cM=
 golang.org/x/net v0.57.0 h1:K5+3DljvIuDG9/Jv9rvyMywYNFCQ9RSUY6OOTTkT+tE=
 golang.org/x/net v0.57.0/go.mod h1:KpXc8iv+r3XplLAG/f7Jsf9RPszJzdR0f58q9vGOuEU=
 golang.org/x/sys v0.47.0 h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=

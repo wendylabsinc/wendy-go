@@ -82,3 +82,22 @@ const (
 	RPCDataLoss           = platform.RPCDataLoss
 	RPCUnauthenticated    = platform.RPCUnauthenticated
 )
+
+// DeviceIdentity is the peer identity the TLS verifier must require.
+// A nonempty Principal is an exact SPIFFE URI constraint, never a legacy tuple.
+type DeviceIdentity = platform.DeviceIdentity
+
+// DeviceConnectRequest selects exactly one endpoint and host credential reference.
+type DeviceConnectRequest = platform.DeviceConnectRequest
+
+// DeviceConnectionEvidence retains typed verifier rejections and TCP failure evidence.
+type DeviceConnectionEvidence = platform.DeviceConnectionEvidence
+
+// DeviceConnection is a host-owned RPC connection with concurrent evidence.
+type DeviceConnection = platform.DeviceConnection
+
+// DeviceConnector opens the endpoint and credential selected by Core.
+type DeviceConnector = platform.DeviceConnector
+
+// DevicePeerRejectedError preserves an eager verifier rejection without allowing fallback.
+type DevicePeerRejectedError = platform.DevicePeerRejectedError
