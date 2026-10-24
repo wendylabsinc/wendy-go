@@ -104,7 +104,6 @@ func (s *grpcServerStream) Header() (Metadata, error) {
 				s.terminal = io.EOF
 				s.headerErr = nil
 			}
-			s.trailers = s.stream.Trailer()
 			s.cancel()
 		}
 		if s.headerErr != nil {
@@ -117,6 +116,7 @@ func (s *grpcServerStream) Header() (Metadata, error) {
 
 func (s *grpcServerStream) Recv() ([]byte, error) {
 	if s.terminal != nil {
+		s.trailers = s.stream.Trailer()
 		return nil, s.terminal
 	}
 	var message []byte

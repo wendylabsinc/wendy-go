@@ -414,6 +414,9 @@ func TestGRPCTrailersOnlyStream(t *testing.T) {
 					if again != err {
 						t.Fatal("header result changed")
 					}
+					if stream.Trailer() != nil {
+						t.Fatal("trailers exposed before terminal Recv")
+					}
 				}
 				_, err = stream.Recv()
 				if fail {
