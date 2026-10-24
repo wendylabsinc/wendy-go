@@ -112,9 +112,10 @@ type ServerVerifyOpts struct {
 	ExpectedOrgID int32      // 0 = accept any org (still extracted for pinning key); never compared against a pki-core leaf, which carries no org
 	PinStore      PinChecker // nil = skip pinning
 	// ExpectedIdentity, when non-nil, requires the server leaf to name this
-	// exact Wendy identity (SameEntity: SPIFFE principals when both sides
-	// carry one, legacy org+asset otherwise). This is the CLI-side counterpart
-	// of agent/mtls.NewClientTLSConfigExpectingIdentity:
+	// exact Wendy identity (an explicit SPIFFE principal must match exactly;
+	// expectations without one retain the legacy org+asset comparison).
+	// This is the CLI-side counterpart of
+	// agent/mtls.NewClientTLSConfigExpectingIdentity:
 	// chain validity alone only proves the peer holds a cert from a trusted CA,
 	// not that it is the device the caller asked for, so any other same-CA cert
 	// could otherwise answer at an mDNS-advertised address.
@@ -350,7 +351,10 @@ func BuildServerVerifyConnection(opts ServerVerifyOpts) (func(tls.ConnectionStat
 			// back to the legacy scope+id triple otherwise, so a pin recorded
 			// before the SPIFFE cutover and one recorded after each compare in
 			// their own terms rather than across them.
-			if !identity.SameEntity(*opts.ExpectedIdentity) {
+			// An explicit principal is an exact pin, including its namespace.
+			// Never downgrade it to a legacy tuple when the peer omits its SAN.
+			if opts.ExpectedIdentity.Principal != "" && identity.Principal != opts.ExpectedIdentity.Principal ||
+				!identity.SameEntity(*opts.ExpectedIdentity) {
 				return &IdentityMismatchError{
 					WantOrg:       opts.ExpectedIdentity.OrgID,
 					WantAsset:     opts.ExpectedIdentity.EntityID,

@@ -1,3 +1,4 @@
+// Adapted from WendyOS go/internal/shared/certs at c68761d4ffd5 (Apache-2.0).
 package devicecerts
 
 import (

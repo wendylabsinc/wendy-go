@@ -20,14 +20,14 @@ duplicate the engine's version string. Go pseudo-version dependencies report a
 development version with the Core commit, such as `0.1.0-dev+ed99070`.
 
 `go.mod` pins `github.com/wendylabsinc/WendyOS/go/wendy-core` to
-`v0.0.0-20261024224127-c68761d4ffd5`. This is an unmerged commit from
+`v0.0.0-20261024225416-0c4f13fed1a1`. This is an unmerged commit from
 [WendyOS #2507 — Move device connection behavior into Wendy Core](https://github.com/wendylabsinc/WendyOS/pull/2507)
 and will be re-pinned after that PR merges.
 
 To select the same Core dependency directly:
 
 ```sh
-GOPROXY=https://proxy.golang.org go get github.com/wendylabsinc/WendyOS/go/wendy-core@v0.0.0-20261024224127-c68761d4ffd5
+GOPROXY=https://proxy.golang.org go get github.com/wendylabsinc/WendyOS/go/wendy-core@v0.0.0-20261024225416-0c4f13fed1a1
 go mod tidy
 ```
 

@@ -222,7 +222,7 @@ func (d *GRPCDeviceConnector) tlsConfig(ctx context.Context, request DeviceConne
 	var expected *certs.WendyIdentity
 	if request.Expected != nil {
 		id := request.Expected
-		expected = &certs.WendyIdentity{OrgID: id.OrgID, TenantUUID: id.TenantUUID, EntityType: id.EntityType, EntityID: id.EntityID}
+		expected = &certs.WendyIdentity{OrgID: id.OrgID, TenantUUID: id.TenantUUID, EntityType: id.EntityType, EntityID: id.EntityID, Principal: id.Principal}
 	}
 	verify, err := certs.BuildServerVerifyConnection(certs.ServerVerifyOpts{
 		ChainPEM: credential.ChainPEM, ExpectedOrgID: credential.OrganizationID, PinStore: d.Pins, ExpectedIdentity: expected,

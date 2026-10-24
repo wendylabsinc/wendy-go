@@ -478,3 +478,59 @@ func TestDeviceConnectorScopedAndLinkLocalRouting(t *testing.T) {
 		})
 	}
 }
+
+func TestDeviceConnectorPrincipalPin(t *testing.T) {
+	const prefix = "spiffe://wendy.sh/tenant/3c0e434d-d082-4c11-a39a-c959d20afbd7/"
+	f := newDeviceTLSFixture(t)
+	for _, tc := range []struct{ peer, other string }{
+		{"device/42", "service/asset-42"},
+		{"service/asset-42", "device/42"},
+	} {
+		t.Run(tc.peer, func(t *testing.T) {
+			address, calls := f.serve(t, prefix+tc.peer)
+			cache := &deviceTestSessionCache{ClientSessionCache: tls.NewLRUClientSessionCache(4)}
+			connector := f.connector(t)
+			connector.SessionCache = func(string, []byte) wendy.DeviceSessionCache { return cache }
+			expected := devices.ExpectedIdentityForPin(devices.DevicePin{Principal: prefix + tc.peer})
+			if expected == nil || expected.EntityID != "42" {
+				t.Fatal("Core lost the principal pin")
+			}
+			c := openDevice(t, connector, address, expected)
+			if _, err := probeDevice(c); err != nil {
+				t.Fatal(err)
+			}
+			_ = c.Close()
+			expected.Principal = prefix + tc.other // Same tenant, type and ID; different principal.
+			c = openDevice(t, connector, address, expected)
+			if _, err := probeDevice(c); err == nil {
+				t.Fatal("accepted another SPIFFE principal")
+			}
+			var mismatch *wendy.DeviceIdentityMismatchError
+			if !errors.As(c.Evidence().IdentityMismatch, &mismatch) || mismatch.WantPrincipal != prefix+tc.other || mismatch.GotPrincipal != prefix+tc.peer || calls.Load() != 1 {
+				t.Fatalf("lost principal rejection: evidence=%+v calls=%d", c.Evidence(), calls.Load())
+			}
+			if _, ok := c.VerifiedIdentity(); ok {
+				t.Fatal("rejected principal exposed as verified")
+			}
+			cache.mu.Lock()
+			defer cache.mu.Unlock()
+			if len(cache.resumed) != 2 || !cache.resumed[1] {
+				t.Fatalf("principal pin was not checked on resumption: %v", cache.resumed)
+			}
+		})
+	}
+}
+
+func TestDeviceConnectorPrincipalCannotDowngradeToLegacy(t *testing.T) {
+	f := newDeviceTLSFixture(t)
+	address, calls := f.serve(t, "urn:wendy:org:7:asset:42")
+	expected := &wendy.DeviceIdentity{OrgID: 7, EntityType: "asset", EntityID: "42", Principal: "spiffe://wendy.sh/tenant/3c0e434d-d082-4c11-a39a-c959d20afbd7/device/42"}
+	c := openDevice(t, f.connector(t), address, expected)
+	if _, err := probeDevice(c); err == nil {
+		t.Fatal("explicit principal was reduced to a legacy tuple")
+	}
+	var mismatch *wendy.DeviceIdentityMismatchError
+	if !errors.As(c.Evidence().IdentityMismatch, &mismatch) || mismatch.WantPrincipal != expected.Principal || mismatch.GotPrincipal != "" || calls.Load() != 0 {
+		t.Fatalf("lost absent-principal rejection: evidence=%+v calls=%d", c.Evidence(), calls.Load())
+	}
+}

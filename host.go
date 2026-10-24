@@ -84,6 +84,7 @@ const (
 )
 
 // DeviceIdentity is the peer identity the TLS verifier must require.
+// A nonempty Principal is an exact SPIFFE URI constraint, never a legacy tuple.
 type DeviceIdentity = platform.DeviceIdentity
 
 // DeviceConnectRequest selects exactly one endpoint and host credential reference.

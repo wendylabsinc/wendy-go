@@ -134,6 +134,12 @@ type HostPins = core.HostPins
 // identity. Hosts own persistence; Core compares observed values.
 type DevicePin = core.DevicePin
 
+// ExpectedIdentityForPin retains a complete SPIFFE principal when known,
+// falling back to the legacy organization/asset constraint for older pins.
+func ExpectedIdentityForPin(pin DevicePin) *wendy.DeviceIdentity {
+	return core.ExpectedIdentityForPin(pin)
+}
+
 // PinVerdict is the result of comparing an observed device identity against the
 // stored pin for its hostname.
 type PinVerdict = core.PinVerdict
