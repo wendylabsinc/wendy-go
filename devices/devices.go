@@ -34,6 +34,18 @@ func OrderDialCandidatesUnbounded(ips []string) []string {
 // LANDevice is host discovery evidence used to select addresses, never identity.
 type LANDevice = core.LANDevice
 
+// LANAgentPort returns the plaintext base port, accounting for mTLS advertisements.
+func LANAgentPort(device LANDevice) int {
+	return core.LANAgentPort(device)
+}
+
+// LANAgentAddresses returns discovered endpoints in Core's preferred order,
+// preserving USB hostname priority and scoped IPv6 literals. Discovery supplies
+// addresses only; the connector must still authenticate the selected device.
+func LANAgentAddresses(device LANDevice) []string {
+	return core.LANAgentAddresses(device)
+}
+
 // AgentVersion is the Agent's existing version/capability response. The wire
 // descriptor is private so hosts can link their own generated Agent messages.
 type AgentVersion = core.AgentVersion

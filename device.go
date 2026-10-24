@@ -77,6 +77,15 @@ type GRPCDeviceConnector struct {
 	// When nil, net.Dialer is used. Proxied non-link-local targets retain grpc-go's
 	// proxy path; TCP evidence is unavailable for those connections.
 	DialContext func(context.Context, string) (net.Conn, error)
+	// DialOptions are applied in order after connector defaults. A caller's
+	// WithContextDialer overrides DialContext and owns TCP dialing and its error
+	// reporting; TCPDialError evidence is then unavailable. grpc.NewClient ignores
+	// blocking/timeout dial options, so RPC contexts still control probe deadlines.
+	// Transport credentials (including WithInsecure) are ignored: the connector
+	// always applies its credentials last, preserving TLS and VerifyConnection.
+	// Non-nil credentials bundles are rejected by grpc-go as incompatible with
+	// the connector's transport credentials. Use WithPerRPCCredentials separately.
+	DialOptions []grpc.DialOption
 	// Debugf receives handshake resumption diagnostics, never certificate/key data.
 	Debugf func(format string, args ...any)
 }
@@ -148,7 +157,6 @@ func (d *GRPCDeviceConnector) ConnectDevice(ctx context.Context, request DeviceC
 		transportCreds = credentials.NewTLS(cfg)
 	}
 	opts := []grpc.DialOption{
-		grpc.WithTransportCredentials(transportCreds),
 		grpc.WithInitialWindowSize(256 * 1024), grpc.WithInitialConnWindowSize(512 * 1024),
 		grpc.WithReadBufferSize(256 * 1024), grpc.WithWriteBufferSize(256 * 1024),
 		grpc.WithKeepaliveParams(keepalive.ClientParameters{Time: 15 * time.Minute, Timeout: 10 * time.Second}),
@@ -191,6 +199,10 @@ func (d *GRPCDeviceConnector) ConnectDevice(ctx context.Context, request DeviceC
 			}))
 		}
 	}
+	opts = append(opts, d.DialOptions...)
+	// Apply transport security last: routing, interceptors and
+	// tuning may be overridden, but the host's identity and pin verifier may not.
+	opts = append(opts, grpc.WithTransportCredentials(transportCreds))
 	conn, err := grpc.NewClient(deviceGRPCTarget(request.Address), opts...)
 	if err != nil {
 		if request.TLS {

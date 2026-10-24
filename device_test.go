@@ -25,7 +25,9 @@ import (
 	"github.com/wendylabsinc/wendy-go/devices"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -220,6 +222,161 @@ func TestDeviceConnectorTLS(t *testing.T) {
 	}
 }
 
+func TestDeviceConnectorCallerDialOptions(t *testing.T) {
+	f := newDeviceTLSFixture(t)
+	address, calls := f.serve(t, "urn:wendy:org:7:asset:42")
+	connector := f.connector(t)
+	connector.DialContext = func(context.Context, string) (net.Conn, error) {
+		t.Error("caller dial option did not override connector routing")
+		return nil, errors.New("default route unavailable")
+	}
+	var dials, intercepts atomic.Int32
+	connector.DialOptions = []grpc.DialOption{
+		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+			t.Error("earlier caller dial option took precedence")
+			return nil, errors.New("earlier route unavailable")
+		}),
+		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
+			if target != "127.0.0.1:1" {
+				t.Errorf("caller target = %q", target)
+			}
+			dials.Add(1)
+			return (&net.Dialer{}).DialContext(ctx, "tcp", address)
+		}),
+		grpc.WithUnaryInterceptor(func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoke grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+			intercepts.Add(1)
+			return invoke(ctx, method, req, reply, cc, opts...)
+		}),
+	}
+	c := openDevice(t, connector, "127.0.0.1:1", &wendy.DeviceIdentity{OrgID: 7, EntityType: "asset", EntityID: "42"})
+	if _, err := probeDevice(c); err != nil {
+		t.Fatal(err)
+	}
+	if dials.Load() == 0 || intercepts.Load() != 1 || calls.Load() != 1 {
+		t.Fatalf("caller options not applied: dials=%d intercepts=%d calls=%d", dials.Load(), intercepts.Load(), calls.Load())
+	}
+	if _, ok := c.VerifiedIdentity(); !ok {
+		t.Fatal("caller routing bypassed TLS verification")
+	}
+}
+
+func TestDeviceConnectorCallerCredentialsCannotReplaceTLS(t *testing.T) {
+	f := newDeviceTLSFixture(t)
+	var callerVerifications atomic.Int32
+	callerTLS := credentials.NewTLS(&tls.Config{
+		Certificates:       []tls.Certificate{f.credential.Certificate},
+		InsecureSkipVerify: true, // A caller must not be able to install this verifier.
+		VerifyConnection: func(tls.ConnectionState) error {
+			callerVerifications.Add(1)
+			return nil
+		},
+	})
+	for _, option := range []struct {
+		name string
+		dial grpc.DialOption
+	}{
+		{"insecure", grpc.WithTransportCredentials(insecure.NewCredentials())},
+		{"legacy insecure", grpc.WithInsecure()},
+		{"nil credentials", grpc.WithTransportCredentials(nil)},
+		{"caller verifier", grpc.WithTransportCredentials(callerTLS)},
+	} {
+		for _, outcome := range []string{"success", "identity mismatch", "pin mismatch"} {
+			t.Run(option.name+"/"+outcome, func(t *testing.T) {
+				address, calls := f.serve(t, "urn:wendy:org:7:asset:42")
+				connector := f.connector(t)
+				connector.DialOptions = []grpc.DialOption{option.dial}
+				expected := &wendy.DeviceIdentity{OrgID: 7, EntityType: "asset", EntityID: "42"}
+				pinError := &devices.PinMismatchError{Key: "urn:wendy:org:7:asset:42", Want: "old", Got: "new"}
+				switch outcome {
+				case "identity mismatch":
+					expected.EntityID = "other"
+				case "pin mismatch":
+					connector.Pins = devicePinFunc(func(*x509.Certificate, string) error { return pinError })
+				}
+				c := openDevice(t, connector, address, expected)
+				_, err := probeDevice(c)
+				if outcome == "success" {
+					if _, ok := c.VerifiedIdentity(); err != nil || !ok || calls.Load() != 1 {
+						t.Fatalf("TLS failed: err=%v verified=%v calls=%d", err, ok, calls.Load())
+					}
+					return
+				}
+				if err == nil || calls.Load() != 0 {
+					t.Fatalf("caller credentials bypassed %s: err=%v calls=%d", outcome, err, calls.Load())
+				}
+				if _, ok := c.VerifiedIdentity(); ok {
+					t.Fatal("rejected peer exposed as verified")
+				}
+				if outcome == "identity mismatch" {
+					var mismatch *wendy.DeviceIdentityMismatchError
+					if !errors.As(c.Evidence().IdentityMismatch, &mismatch) {
+						t.Fatalf("lost identity verifier: %+v", c.Evidence())
+					}
+				} else if !errors.Is(c.Evidence().PinMismatch, pinError) {
+					t.Fatalf("lost pin verifier: %+v", c.Evidence())
+				}
+			})
+		}
+	}
+	if callerVerifications.Load() != 0 {
+		t.Fatal("caller TLS verifier replaced connector verification")
+	}
+}
+
+func TestDeviceConnectorCallerOptionsOnPlaintext(t *testing.T) {
+	listener := bufconn.Listen(1024 * 1024)
+	server := grpc.NewServer(grpc.UnknownServiceHandler(func(_ any, stream grpc.ServerStream) error {
+		if err := stream.RecvMsg(new(emptypb.Empty)); err != nil {
+			return err
+		}
+		return stream.SendMsg(new(emptypb.Empty))
+	}))
+	go func() { _ = server.Serve(listener) }()
+	t.Cleanup(func() { server.Stop(); _ = listener.Close() })
+	connector := &wendy.GRPCDeviceConnector{DialOptions: []grpc.DialOption{
+		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
+			return listener.DialContext(ctx)
+		}),
+		// The request controls transport security even when a caller asks for TLS.
+		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})),
+	}}
+	c, err := connector.ConnectDevice(context.Background(), wendy.DeviceConnectRequest{Address: "127.0.0.1:1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	if _, err := probeDevice(c); err != nil {
+		t.Fatal(err)
+	}
+}
+
+type deviceTestCredentialsBundle struct{}
+
+func (b deviceTestCredentialsBundle) TransportCredentials() credentials.TransportCredentials {
+	return insecure.NewCredentials()
+}
+
+func (deviceTestCredentialsBundle) PerRPCCredentials() credentials.PerRPCCredentials { return nil }
+
+func (b deviceTestCredentialsBundle) NewWithMode(string) (credentials.Bundle, error) { return b, nil }
+
+func TestDeviceConnectorRejectsCallerCredentialsBundle(t *testing.T) {
+	f := newDeviceTLSFixture(t)
+	for _, useTLS := range []bool{true, false} {
+		connector := f.connector(t)
+		connector.DialOptions = []grpc.DialOption{grpc.WithCredentialsBundle(deviceTestCredentialsBundle{})}
+		connection, err := connector.ConnectDevice(context.Background(), wendy.DeviceConnectRequest{
+			Address: "127.0.0.1:1", TLS: useTLS, Credential: "operator",
+		})
+		if connection != nil {
+			_ = connection.Close()
+		}
+		if err == nil || connection != nil {
+			t.Fatalf("accepted caller credentials bundle (TLS=%v): connection=%v err=%v", useTLS, connection, err)
+		}
+	}
+}
+
 type devicePinFunc func(*x509.Certificate, string) error
 
 func (f devicePinFunc) CheckAndUpdate(c *x509.Certificate, name string) error { return f(c, name) }
@@ -381,7 +538,15 @@ func TestDeviceDialThroughFacade(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	base := net.JoinHostPort(host, strconv.Itoa(port-1))
+	lan := devices.LANDevice{IPAddress: host, Port: port, IsMTLS: true}
+	if basePort := devices.LANAgentPort(lan); basePort != port-devices.AgentMTLSPortOffset {
+		t.Fatalf("advertised mTLS port %d resolved to base port %d", port, basePort)
+	}
+	addresses := devices.LANAgentAddresses(lan)
+	if len(addresses) != 1 {
+		t.Fatalf("LAN endpoints = %v", addresses)
+	}
+	base := addresses[0]
 	for _, mismatch := range []bool{false, true} {
 		before := calls.Load()
 		expected := &wendy.DeviceIdentity{OrgID: 7, EntityType: "asset", EntityID: "42"}
