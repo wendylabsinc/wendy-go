@@ -3,7 +3,9 @@ module github.com/wendylabsinc/wendy-go
 go 1.27.0
 
 require (
-	github.com/wendylabsinc/WendyOS/go/wendy-core v0.0.0-20261024213152-68128e84325a
+	github.com/cloudflare/circl v1.6.3
+	github.com/google/uuid v1.6.0
+	github.com/wendylabsinc/WendyOS/go/wendy-core v0.0.0-20261024224127-c68761d4ffd5
 	golang.org/x/net v0.57.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800
 	google.golang.org/grpc v1.84.0
