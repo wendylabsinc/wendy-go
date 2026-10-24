@@ -5,6 +5,30 @@ import "github.com/wendylabsinc/WendyOS/go/wendy-core/platform"
 // Signer is Core's host-owned signing capability.
 type Signer = platform.Signer
 
+// IdentityKey adds PKCS#10 creation and certificate key-binding checks to Signer.
+type IdentityKey = platform.IdentityKey
+
+// CertificateIdentity contains host-checked public certificate material.
+type CertificateIdentity = platform.CertificateIdentity
+
+// HTTPTransport sends HTTP data through host networking and TLS.
+type HTTPTransport = platform.HTTPTransport
+
+// HTTPRequest holds an HTTP method, URL, headers and body bytes.
+type HTTPRequest = platform.HTTPRequest
+
+// HTTPResponse transfers ownership of its headers and closeable body to Core.
+type HTTPResponse = platform.HTTPResponse
+
+// HTTPHeaders preserves repeated HTTP header values.
+type HTTPHeaders = platform.HTTPHeaders
+
+// SignatureVerifier verifies exact JWS signing bytes against a public JWK.
+type SignatureVerifier = platform.SignatureVerifier
+
+// Entropy supplies caller-owned bytes from a host's secure random generator.
+type Entropy = platform.Entropy
+
 // SignatureAlgorithm identifies a signature scheme by its protocol name.
 type SignatureAlgorithm = platform.SignatureAlgorithm
 
