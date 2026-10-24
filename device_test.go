@@ -538,7 +538,15 @@ func TestDeviceDialThroughFacade(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	base := net.JoinHostPort(host, strconv.Itoa(port-1))
+	lan := devices.LANDevice{IPAddress: host, Port: port, IsMTLS: true}
+	if basePort := devices.LANAgentPort(lan); basePort != port-devices.AgentMTLSPortOffset {
+		t.Fatalf("advertised mTLS port %d resolved to base port %d", port, basePort)
+	}
+	addresses := devices.LANAgentAddresses(lan)
+	if len(addresses) != 1 {
+		t.Fatalf("LAN endpoints = %v", addresses)
+	}
+	base := addresses[0]
 	for _, mismatch := range []bool{false, true} {
 		before := calls.Load()
 		expected := &wendy.DeviceIdentity{OrgID: 7, EntityType: "asset", EntityID: "42"}
