@@ -1,6 +1,6 @@
 # WendyGo
 
-The Wendy SDK for Go, built on [Wendy Core](https://github.com/wendylabsinc/wendy-core).
+The Wendy SDK for Go, built on [Wendy Core](https://github.com/wendylabsinc/WendyOS/tree/main/go/wendy-core).
 
 ```go
 import "github.com/wendylabsinc/wendy-go"
@@ -9,28 +9,25 @@ value := wendy.HelloWorld() // 42, computed by Wendy Core
 version := wendy.CoreVersion() // version of the linked Wendy Core engine
 ```
 
-WendyGo is the Go API for Wendy's own programs (the CLI and the Agent) as well as third-party Go code. It calls Wendy Core's Go API (`github.com/wendylabsinc/wendy-core/core`) directly, not through Core's C interface, and needs no cgo. Shared behavior belongs in Wendy Core, so a fix there reaches every client and language. This SDK adds Go conveniences on top, not separate product behavior.
+WendyGo is the Go API for Wendy's own programs (the CLI and the Agent) as well as third-party Go code. It calls Wendy Core's Go API (`github.com/wendylabsinc/WendyOS/go/wendy-core/core`) directly, not through Core's C interface, and needs no cgo. Shared behavior belongs in Wendy Core, so a fix there reaches every client and language. This SDK adds Go conveniences on top, not separate product behavior.
 
 This is a scaffold: `HelloWorld()` is a temporary operation that proves the SDK reaches the shared engine. Real APIs move in step by step.
 
 ## Wendy Core dependency
 
 `CoreVersion()` reports Wendy Core's version directly, so clients do not need to
-duplicate the engine's version string. This seed reports `0.1.0-seed.1`.
+duplicate the engine's version string. Go pseudo-version dependencies report a
+development version with the Core commit, such as `0.1.0-dev+ed99070`.
 
-`go.mod` requires Wendy Core `v0.1.0-seed.1`.
+`go.mod` pins `github.com/wendylabsinc/WendyOS/go/wendy-core` to
+`v0.0.0-20261024163831-ed99070fd9fe`. This is an unmerged commit from
+[WendyOS #2490 — Move Wendy Core into WendyOS with its full history](https://github.com/wendylabsinc/WendyOS/pull/2490)
+and will be re-pinned after that PR merges.
 
-For the WendyGo seed release, request the pre-release explicitly:
-
-```sh
-go get github.com/wendylabsinc/wendy-go@v0.1.0-seed.1
-```
-
-`@latest` selects the stable `v0.0.1` release instead of the seed pre-release.
-To select this seed of Wendy Core directly:
+To select the same Core dependency directly:
 
 ```sh
-go get github.com/wendylabsinc/wendy-core@v0.1.0-seed.1
+go get github.com/wendylabsinc/WendyOS/go/wendy-core@v0.0.0-20261024163831-ed99070fd9fe
 go mod tidy
 ```
 
@@ -39,6 +36,7 @@ go mod tidy
 Requires Go 1.24+.
 
 ```sh
+go build ./...
 go vet ./...
 go test ./...
 ```

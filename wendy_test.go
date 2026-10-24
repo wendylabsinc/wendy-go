@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/wendylabsinc/wendy-core/core"
+	"github.com/wendylabsinc/WendyOS/go/wendy-core/core"
 	"github.com/wendylabsinc/wendy-go"
 )
 
