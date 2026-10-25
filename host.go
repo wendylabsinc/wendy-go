@@ -101,3 +101,22 @@ type DeviceConnector = platform.DeviceConnector
 
 // DevicePeerRejectedError preserves an eager verifier rejection without allowing fallback.
 type DevicePeerRejectedError = platform.DevicePeerRejectedError
+
+// LegacyProofSigner signs SHA-256 legacy Cloud ingress proofs as ASN.1 ECDSA.
+type LegacyProofSigner = platform.LegacyProofSigner
+
+// ProofCertificate contains host-parsed public certificate facts, never trust.
+type ProofCertificate = platform.ProofCertificate
+
+// ProofVerifier parses certificates and verifies exact pure ML-DSA-65/87 bytes.
+type ProofVerifier = platform.ProofVerifier
+
+// CompletionSigner signs canonical device reset receipts with the existing key.
+type CompletionSigner = platform.CompletionSigner
+
+// RevocationEvidence contains issuer-authenticated OCSP facts for an exact leaf.
+type RevocationEvidence = platform.RevocationEvidence
+
+// ReceiptVerifier authenticates receipt signatures and OCSP issuer/leaf binding.
+// It does not establish remote root or Cloud-key trust.
+type ReceiptVerifier = platform.ReceiptVerifier
