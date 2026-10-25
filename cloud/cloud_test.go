@@ -331,3 +331,59 @@ func sendMessage(stream grpc.ServerStream, message proto.Message) error {
 	}
 	return stream.SendMsg(wire)
 }
+
+func TestSignerWorkflowMetadataThroughPublicFacade(t *testing.T) {
+	key, host := operator(t)
+	base, err := cloud.NewSigner(context.Background(), host, tenant, wendy.CryptoEntropy{}, cloud.SignerOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := wendy.Metadata{{Name: "x-correlation-id", Value: []byte("lite-flow")}, {Name: "x-host-context", Value: []byte("host-flow")}}
+	signer := base.WithMetadata(input)
+	input[0].Value[0] = 'X'
+	input[1].Name = "changed"
+	for _, tc := range []struct {
+		name, want string
+		signer     *cloud.Signer
+		metadata   wendy.Metadata
+	}{
+		{name: "default", want: "lite-flow", signer: signer},
+		{name: "override", want: "explicit", signer: signer, metadata: wendy.Metadata{{Name: "x-correlation-id", Value: []byte("explicit")}}},
+		{name: "original", want: "original", signer: base},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			transport := rpcTransport(t, func(stream grpc.ServerStream, method string, wire []byte) error {
+				if method == "/wendycloud.v2.OperatorSessionService/RegisterOperatorLeaf" {
+					return status.Error(codes.Unimplemented, "older Cloud")
+				}
+				if method != deleteMethod {
+					return fmt.Errorf("unexpected method %s", method)
+				}
+				var envelope cloud.SignedRequest
+				if err := proto.Unmarshal(wire, &envelope); err != nil {
+					return err
+				}
+				_, claims := verifyJWS(t, key, envelope.Signature)
+				md, _ := metadata.FromIncomingContext(stream.Context())
+				if tc.name == "original" {
+					if claims["correlation_id"] == "lite-flow" || len(md.Get("x-correlation-id")) != 0 || len(md.Get("x-host-context")) != 0 {
+						return fmt.Errorf("original signer was mutated")
+					}
+				} else if claims["correlation_id"] != tc.want || !reflect.DeepEqual(md.Get("x-correlation-id"), []string{tc.want}) {
+					return fmt.Errorf("workflow correlation ID lost")
+				}
+				if tc.name == "default" && !reflect.DeepEqual(md.Get("x-host-context"), []string{"host-flow"}) {
+					return fmt.Errorf("default metadata was not copied")
+				}
+				if tc.name == "override" && len(md.Get("x-host-context")) != 0 {
+					return fmt.Errorf("explicit metadata did not replace default")
+				}
+				return sendMessage(stream, &cloud.DeleteAssetResponse{})
+			})
+			_, _, err := (&cloud.Client{Transport: transport}).DeleteAsset(context.Background(), tc.signer, &cloud.DeleteAssetRequest{Id: assetID}, cloud.InvokeOptions{Metadata: tc.metadata})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
