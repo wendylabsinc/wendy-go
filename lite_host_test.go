@@ -9,9 +9,12 @@ import (
 	"crypto/mldsa"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
+	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"io"
@@ -221,5 +224,41 @@ func TestLiteTimeSourcePinsAndCancellation(t *testing.T) {
 	cancel()
 	if _, err := source.Query(ctx, first, make([]byte, 32)); !errors.Is(err, context.Canceled) {
 		t.Fatalf("cancellation lost: %v", err)
+	}
+}
+
+func TestLiteSignedTimestampThroughGoHost(t *testing.T) {
+	nonce := bytes.Repeat([]byte{0xa5}, 32)
+	proof := []byte("opaque timestamp evidence verified by firmware")
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Version int
+			Imprint struct {
+				Algorithm pkix.AlgorithmIdentifier
+				Digest    []byte
+			}
+			Nonce   *big.Int
+			CertReq bool
+		}
+		der, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		rest, err := asn1.Unmarshal(der, &request)
+		digest := sha256.Sum256(nonce)
+		if err != nil || len(rest) != 0 || r.Method != "POST" || r.Header.Get("Content-Type") != "application/timestamp-query" || request.Version != 1 || !request.CertReq || request.Nonce == nil || !bytes.Equal(request.Nonce.Bytes(), nonce) || !bytes.Equal(request.Imprint.Digest, digest[:]) {
+			t.Errorf("device nonce/request changed: %+v, %v", request, err)
+		}
+		_, _ = w.Write(proof)
+	}))
+	defer server.Close()
+	transport, err := wendy.NewLiteHTTPTransport(server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := liteenroll.SignedTime(context.Background(), transport, server.URL, hex.EncodeToString(nonce))
+	if err != nil || !bytes.Equal(got, proof) {
+		t.Fatalf("timestamp evidence changed: %q, %v", got, err)
 	}
 }

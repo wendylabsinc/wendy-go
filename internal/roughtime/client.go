@@ -62,13 +62,15 @@ func QueryServerWithNonce(ctx context.Context, srv Server, nonce []byte) (Result
 	stop := context.AfterFunc(ctx, func() { conn.Close() })
 	defer stop()
 
-	deadline, ok := ctx.Deadline()
-	if !ok {
-		deadline = time.Now().Add(3 * time.Second)
+	deadline, _ := ctx.Deadline() // Guaranteed by the default bound above.
+	if err := conn.SetDeadline(deadline); err != nil {
+		return Result{}, fmt.Errorf("deadline: %w", err)
 	}
-	_ = conn.SetDeadline(deadline)
 
 	if _, err := conn.Write(req); err != nil {
+		if ctx.Err() != nil {
+			return Result{}, ctx.Err()
+		}
 		return Result{}, fmt.Errorf("send: %w", err)
 	}
 
@@ -86,8 +88,8 @@ func QueryServerWithNonce(ctx context.Context, srv Server, nonce []byte) (Result
 }
 
 // VerifyResponse verifies a raw Roughtime server response against the
-// given nonce and server public key. Exported so the agent's multicast
-// listener can re-verify a relayed response without re-querying.
+// given nonce and pinned server public key. Raw response bytes are retained
+// unchanged for firmware to verify independently.
 func VerifyResponse(rawResp, nonce []byte, srv Server) (Result, error) {
 	msg, framed, err := decodeFrame(rawResp)
 	if err != nil {
