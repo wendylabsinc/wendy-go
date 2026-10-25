@@ -155,17 +155,21 @@ func TestLiteHTTPRedirectAndCancellation(t *testing.T) {
 	var redirected atomic.Int32
 	target := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { redirected.Add(1) }))
 	defer target.Close()
+	releaseBody := make(chan struct{})
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/body" {
 			w.WriteHeader(http.StatusOK)
 			w.(http.Flusher).Flush()
-			<-r.Context().Done()
+			// Keep EOF out of the race with client cancellation.
+			<-releaseBody
 			return
 		}
 		http.Redirect(w, r, target.URL, http.StatusTemporaryRedirect)
 	}))
 	defer server.Close()
+	defer close(releaseBody)
 	client := server.Client()
+	client.Timeout = 2 * time.Second
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { t.Error("caller's redirect policy ran"); return nil }
 	transport, err := wendy.NewLiteHTTPTransport(client)
 	if err != nil {
