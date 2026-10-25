@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/cloudflare/circl v1.6.3
 	github.com/google/uuid v1.6.0
-	github.com/wendylabsinc/WendyOS/go/wendy-core v0.0.0-20261025100224-ec5960ac5dfe
+	github.com/wendylabsinc/WendyOS/go/wendy-core v0.0.0-20261025104633-e66a4c8b53e5
 	golang.org/x/crypto v0.57.0
 	golang.org/x/net v0.58.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800
