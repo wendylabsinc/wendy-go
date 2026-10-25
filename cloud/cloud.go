@@ -1,6 +1,7 @@
 // Package cloud exposes Wendy Core's shared Cloud request signing,
-// authentication and inventory behavior. Hosts supply authenticated transports,
-// signing keys and entropy; they retain TLS, key storage and session refresh.
+// authentication, inventory and basic inbox behavior. Hosts supply authenticated
+// transports, signing keys and entropy; they retain TLS, key storage and session
+// refresh.
 package cloud
 
 import (
@@ -14,6 +15,9 @@ import (
 // ListDevices returns the complete bounded inventory or an error, with no
 // partial success. The upstream API does not guarantee a consistent snapshot
 // while devices change; no pagination offsets are exposed by this client.
+// Inbox methods use typed requests, without SignedRequest envelopes. Their
+// transport must resolve the current Cloud token and bound key and obtain fresh
+// exact-method AuthenticationMetadata for every RPC, batch and continuation.
 type Client = core.Client
 
 // Asset preserves Cloud v2 asset UUIDs, device metadata and unknown fields.

@@ -1,8 +1,10 @@
 package lite_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -147,5 +149,26 @@ func TestPublicSensorTypesAndCatalog(t *testing.T) {
 	}
 	if _, err = lite.WendyLiteFirmwareID(boards[0].Board); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestPublicAssemblerRejectsOversizedFirstChunks(t *testing.T) {
+	for _, last := range []bool{false, true} {
+		t.Run(fmt.Sprint("last=", last), func(t *testing.T) {
+			var asm lite.Assembler
+			flags := uint32(0)
+			if last {
+				flags = lite.FlagLastChunk
+			}
+			if frame := asm.Add(&pb.SensorData{ChannelId: 1, FrameSeq: 1, Flags: flags, Payload: make([]byte, lite.MaxFrameBytes+1)}); frame != nil {
+				t.Fatal("oversized first chunk accepted")
+			}
+			if frame := asm.Add(&pb.SensorData{ChannelId: 1, FrameSeq: 1, ChunkSeq: 1, Flags: lite.FlagLastChunk, Payload: []byte{1}}); frame != nil {
+				t.Fatal("discarded frame resumed")
+			}
+			if frame := asm.Add(&pb.SensorData{ChannelId: 1, FrameSeq: 2, Flags: lite.FlagLastChunk, Payload: []byte{2}}); frame == nil || !bytes.Equal(frame.Payload, []byte{2}) {
+				t.Fatal("valid next frame lost")
+			}
+		})
 	}
 }
