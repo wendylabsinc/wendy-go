@@ -35,6 +35,16 @@ func NewHTTPTransport(client *http.Client) (*NetHTTPTransport, error) {
 // the caller must close the body. Status codes, including redirects and errors,
 // are returned unchanged. Errors exclude URLs, credentials and remote details.
 func (t *NetHTTPTransport) Do(ctx context.Context, request HTTPRequest) (*HTTPResponse, error) {
+	resp, err := t.doResponse(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	return &HTTPResponse{StatusCode: resp.StatusCode, Headers: HTTPHeaders(resp.Header.Clone()), Body: resp.Body}, nil
+}
+
+// doResponse retains TLS evidence for the Lite adapter, with the same request
+// validation, cancellation and redirect policy as the ordinary HTTP adapter.
+func (t *NetHTTPTransport) doResponse(ctx context.Context, request HTTPRequest) (*http.Response, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -68,5 +78,5 @@ func (t *NetHTTPTransport) Do(ctx context.Context, request HTTPRequest) (*HTTPRe
 		}
 		return nil, errors.New("HTTP request failed")
 	}
-	return &HTTPResponse{StatusCode: resp.StatusCode, Headers: HTTPHeaders(resp.Header.Clone()), Body: resp.Body}, nil
+	return resp, nil
 }

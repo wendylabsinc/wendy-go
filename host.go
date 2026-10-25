@@ -120,3 +120,26 @@ type RevocationEvidence = platform.RevocationEvidence
 // ReceiptVerifier authenticates receipt signatures and OCSP issuer/leaf binding.
 // It does not establish remote root or Cloud-key trust.
 type ReceiptVerifier = platform.ReceiptVerifier
+
+// LiteLink exchanges serialized WendyCom messages over a caller-established
+// framed link. Hosts supply serial/USB/BLE access, TLS, deadlines and Close
+// that interrupts blocked operations; Send must be safe for concurrent calls.
+type LiteLink = platform.LiteLink
+
+// LiteCertificate holds public certificate facts checked by the host.
+type LiteCertificate = platform.LiteCertificate
+
+// LiteCertificateInspector parses public DER and inspects signature algorithms.
+type LiteCertificateInspector = platform.LiteCertificateInspector
+
+// LiteHTTPResponse includes authenticated TLS chains for trust discovery.
+type LiteHTTPResponse = platform.LiteHTTPResponse
+
+// LiteHTTPTransport supplies HTTPS without redirects or retries.
+type LiteHTTPTransport = platform.LiteHTTPTransport
+
+// LiteTimeServer names a firmware-supported signed time server.
+type LiteTimeServer = platform.LiteTimeServer
+
+// LiteTimeSource obtains signed evidence bound to a device-generated nonce.
+type LiteTimeSource = platform.LiteTimeSource
